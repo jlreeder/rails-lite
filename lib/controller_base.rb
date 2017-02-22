@@ -1,5 +1,6 @@
 require 'active_support'
 require 'active_support/core_ext'
+require 'byebug'
 require 'erb'
 require_relative './session'
 
@@ -23,6 +24,7 @@ class ControllerBase
     res.header['location'] = url
     res.status = 302
     @already_built_response = true
+    session.store_session(res)
   end
 
   # Populate the response with content.
@@ -33,15 +35,32 @@ class ControllerBase
     res['Content-Type'] = content_type
     res.write(content)
     @already_built_response = true
+    session.store_session(res)
   end
 
   # use ERB and binding to evaluate templates
   # pass the rendered html to render_content
   def render(template_name)
+    # Construct path
+    controller_name = self.class.to_s.underscore
+    file_name = "views/#{controller_name}/#{template_name}.html.erb"
+
+    # Read template file
+    contents = File.read(file_name)
+    erb = ERB.new(contents)
+
+    # evaluate template
+    # TODO: Why is binding necessary? The specs pass with or without.
+    template = erb.result(binding)
+
+    # render template
+    content_type = 'text/html'
+    render_content(template, content_type)
   end
 
   # method exposing a `Session` object
   def session
+    @session ||= Session.new(req)
   end
 
   # use this with the router to call action_name (:index, :show, :create...)
